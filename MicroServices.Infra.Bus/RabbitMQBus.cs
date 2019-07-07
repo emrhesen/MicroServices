@@ -36,7 +36,9 @@ namespace MicroServices.Infra.Bus
         {
             var factory = new ConnectionFactory()
             {
-                HostName = "localhost"
+                HostName = "192.168.1.2",
+                UserName = "emrah",
+                Password = "emrah"
             };
 
             using (var connection = factory.CreateConnection())
@@ -85,8 +87,10 @@ namespace MicroServices.Infra.Bus
         {
             var factory = new ConnectionFactory()
             {
-                HostName = "localhost",
-                DispatchConsumersAsync = true
+                HostName = "192.168.1.2",
+                DispatchConsumersAsync = true,
+                UserName = "emrah",
+                Password = "emrah"
             };
 
             var connection = factory.CreateConnection();

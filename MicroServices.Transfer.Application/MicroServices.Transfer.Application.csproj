@@ -5,9 +5,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Interfaces\" />
     <Folder Include="Models\" />
-    <Folder Include="Services\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MicroServices.Domain.Core\MicroServices.Domain.Core.csproj" />
+    <ProjectReference Include="..\MicroServices.Transfer.Domain\MicroServices.Transfer.Domain.csproj" />
   </ItemGroup>
 
 </Project>

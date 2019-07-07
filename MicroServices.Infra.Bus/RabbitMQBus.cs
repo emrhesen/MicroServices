@@ -1,16 +1,16 @@
-﻿using MicroServices.Domain.Core.Bus;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices.ComTypes;
-using System.Text;
-using System.Threading.Tasks;
-using MediatR;
+﻿using MediatR;
+using MicroServices.Domain.Core.Bus;
 using MicroServices.Domain.Core.Commands;
 using MicroServices.Domain.Core.Events;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace MicroServices.Infra.Bus
 {
@@ -19,10 +19,12 @@ namespace MicroServices.Infra.Bus
         private readonly IMediator _mediator;
         private readonly Dictionary<string, List<Type>> _handlers;
         private readonly List<Type> _eventTypes;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public RabbitMQBus(IMediator mediator)
+        public RabbitMQBus(IMediator mediator, IServiceScopeFactory serviceScopeFactory)
         {
             _mediator = mediator;
+            _serviceScopeFactory = serviceScopeFactory;
             _handlers = new Dictionary<string, List<Type>>();
             _eventTypes = new List<Type>();
         }
@@ -106,18 +108,17 @@ namespace MicroServices.Infra.Bus
             channel.BasicConsume(eventName,true,consumer);
         }
 
-        private async Task Consumer_Received(object sender, BasicDeliverEventArgs @event)
+        private async Task Consumer_Received(object sender, BasicDeliverEventArgs e)
         {
-            var eventName = @event.RoutingKey;
-            var message = Encoding.UTF8.GetString(@event.Body);
+            var eventName = e.RoutingKey;
+            var message = Encoding.UTF8.GetString(e.Body);
 
             try
             {
-                await ProcessEvent(eventName,message).ConfigureAwait(false);
+                await ProcessEvent(eventName, message).ConfigureAwait(false);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-              
             }
         }
 
@@ -125,21 +126,18 @@ namespace MicroServices.Infra.Bus
         {
             if (_handlers.ContainsKey(eventName))
             {
-                var subscriptions = _handlers[eventName];
-
-                foreach (var subscription in subscriptions)
+                using (var scope = _serviceScopeFactory.CreateScope())
                 {
-                    var handler = Activator.CreateInstance(subscription);
-                    if (handler == null) continue;
-                    var eventType = _eventTypes.SingleOrDefault(e => e.Name == eventName);
-                    var @event = JsonConvert.DeserializeObject(message, eventType);
-                    var concreteType = typeof(IEventHandler<>).MakeGenericType(eventType);
-
-                    await (Task) concreteType.GetMethod("Handle").Invoke(handler, new object[] {@event});
-
-
-
-
+                    var subscriptions = _handlers[eventName];
+                    foreach (var subscription in subscriptions)
+                    {
+                        var handler = scope.ServiceProvider.GetService(subscription);
+                        if (handler == null) continue;
+                        var eventType = _eventTypes.SingleOrDefault(t => t.Name == eventName);
+                        var @event = JsonConvert.DeserializeObject(message, eventType);
+                        var conreteType = typeof(IEventHandler<>).MakeGenericType(eventType);
+                        await (Task)conreteType.GetMethod("Handle").Invoke(handler, new object[] { @event });
+                    }
                 }
             }
         }

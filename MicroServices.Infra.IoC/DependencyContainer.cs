@@ -12,6 +12,13 @@ using MicroServices.Banking.Domain.Commands;
 using MicroServices.Banking.Domain.Interfaces;
 using MicroServices.Domain.Core.Bus;
 using MicroServices.Infra.Bus;
+using MicroServices.Transfer.Application.Interfaces;
+using MicroServices.Transfer.Application.Services;
+using MicroServices.Transfer.Data.Context;
+using MicroServices.Transfer.Data.Repository;
+using MicroServices.Transfer.Domain.EventHandlers;
+using MicroServices.Transfer.Domain.Events;
+using MicroServices.Transfer.Domain.Interfaces;
 
 namespace MicroServices.Infra.IoC
 {
@@ -19,18 +26,31 @@ namespace MicroServices.Infra.IoC
     {
         public static void RegisterServices(IServiceCollection services)
         {
-            // Domain Bus
-            services.AddTransient<IEventBus, RabbitMQBus>();
+            //Domain Bus
+            services.AddSingleton<IEventBus, RabbitMQBus>(sp =>
+            {
+                var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+                return new RabbitMQBus(sp.GetService<IMediator>(), scopeFactory);
+            });
 
-            // Domain Banking Commands
-            services.AddTransient<IRequestHandler<CreateTransferCommand,bool>,TransferCommandHandler>();
+            //Subscriptions
+            services.AddTransient<TransferEventHandler>();
 
-            // Application Services
-            services.AddTransient<IAccountService , AccountService>();
+            //Domain Events
+            services.AddTransient<IEventHandler<TransferCreatedEvent>, TransferEventHandler>();
 
-            // Data 
+            //Domain Banking Commands
+            services.AddTransient<IRequestHandler<CreateTransferCommand, bool>, TransferCommandHandler>();
+
+            //Application Services
+            services.AddTransient<IAccountService, AccountService>();
+            services.AddTransient<ITransferService, TransferService>();
+
+            //Data
             services.AddTransient<IAccountRepository, AccountRepository>();
+            services.AddTransient<ITransferRepository, TransferRepository>();
             services.AddTransient<BankingDbContext>();
+            services.AddTransient<TransferDbContext>();
         }
     }
 }
